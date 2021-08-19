@@ -15,7 +15,8 @@ for mode in ["sequential", "multi-threaded", "asynchronous"]:
     "ChildNotebook",
     3600, # timeout: 1 hour
     {
-      "mode": mode
+      "mode": mode,
+      "number_of_requests": 300
     }
   )
 
