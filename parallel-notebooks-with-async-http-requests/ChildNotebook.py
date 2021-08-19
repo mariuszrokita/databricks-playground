@@ -1,5 +1,7 @@
 # Databricks notebook source
 import json
+import time
+import timeit
 
 # COMMAND ----------
 
@@ -12,17 +14,18 @@ print("selected mode:", selected_mode)
 
 def sequential():
   print("sequential()")
-  return "00:00:20.4"
+  time.sleep(1)
 
 
 def multi_threaded():
   print("multi-threaded()")
-  return "00:00:04.7"
+  time.sleep(1)
 
 
 def asynchronous():
   print("asynchronous()")
-  return "00:00:00.8"
+  time.sleep(1)
+
 
 # COMMAND ----------
 
@@ -33,7 +36,11 @@ switch = {
 }
 
 func = switch[selected_mode]
-duration = func()
+
+no_repeats = 3
+# timeit() disables the garbage collection that could skew the results.
+# More info on:  https://www.oreilly.com/library/view/python-cookbook/0596001673/ch17.html
+duration = timeit.timeit(func, number=no_repeats) / no_repeats
 
 # COMMAND ----------
 
