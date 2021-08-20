@@ -1,4 +1,10 @@
 # Databricks notebook source
+dbutils.library.installPyPI("aiohttp")
+
+# COMMAND ----------
+
+import aiohttp
+import asyncio
 import json
 import requests
 import time
@@ -30,6 +36,16 @@ def get_pokemon_weight(url):
     return 0
 
 
+async def get_pokemon_weight_async(session, url):
+  async with session.get(url) as resp:
+    if resp.status == 200:
+      pokemon = await resp.json()
+      return pokemon['weight']
+    else:
+      # TODO: shouldn't we throw error?
+      return 0
+
+
 def sum_array(arr):
   # Functional programming approach. More info: https://realpython.com/python-reduce-function/
   total = reduce(lambda x, y: x+y, arr)  # sum(arr) would wefine as well
@@ -38,52 +54,62 @@ def sum_array(arr):
 
 def sequential(urls):
   print("sequential()")
-
   weights = []
   for url in urls:
     weight = get_pokemon_weight(url)
+    print(weight)
     weights.append(weight)
-
   print("Weight total:", sum_array(weights))
 
 
 def multi_threaded(urls):
   print("multi-threaded()")
-
   weights = []
   with concurrent.futures.ThreadPoolExecutor() as executor:
-    futures = []
-    for url in urls:
-      futures.append(executor.submit(get_pokemon_weight, url=url))
+    futures = [executor.submit(get_pokemon_weight, url=url) for url in urls]
     for future in concurrent.futures.as_completed(futures):
-        weight = future.result()
-        print(weight)
-        weights.append(weight)
+      weight = future.result()
+      print(weight)
+      weights.append(weight)
   print("Weight total:", sum_array(weights))
 
 
-def asynchronous(urls):
+async def asynchronous(urls):
   print("asynchronous()")
-  time.sleep(1)
+  weights = []
+  async with aiohttp.ClientSession() as session:
+    tasks = [asyncio.ensure_future(get_pokemon_weight_async(session, url)) for url in urls]
+    results = await asyncio.gather(*tasks)
+    for r in results:
+      print(r)
+      weights.append(r)
+
+  print("Weight total:", sum_array(weights))
 
 
 # COMMAND ----------
 
+# Generate list of URL to make requests to.
+urls = ["https://pokeapi.co/api/v2/pokemon/" + str(i) for i in range(number_of_requests)]
+
+# Choose function to execute based on chosen mode
 switch = {
   'sequential': sequential,
   'multi-threaded': multi_threaded,
   'asynchronous': asynchronous
 }
-
 func = switch[selected_mode]
 
-# Generate list of URL to make requests to.
-urls = ["https://pokeapi.co/api/v2/pokemon/" + str(i) for i in range(number_of_requests)]
-
-no_repeats = 1
 # timeit() disables the garbage collection that could skew the results.
 # More info on:  https://www.oreilly.com/library/view/python-cookbook/0596001673/ch17.html
-duration = timeit.timeit(lambda: func(urls), number=no_repeats) / no_repeats
+if selected_mode == 'asynchronous':
+  func_to_gauge = lambda: asyncio.run(func(urls))
+else:
+  func_to_gauge = lambda: func(urls)
+
+no_repeats = 1
+duration = timeit.timeit(func_to_gauge, number=no_repeats) / no_repeats
+
 
 # COMMAND ----------
 
